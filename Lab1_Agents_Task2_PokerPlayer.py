@@ -10,7 +10,6 @@ import random
 
 ranks = [2, 3, 4, 5, 6, 7, 8, 9, 10, 'J', 'Q', 'K', 'A']
 suits = ['s', 'h', 'd', 'c']
-deck = [str(r) + s for r in ranks and s in suits]
 
 # 2 example poker hands
 example_hand1 = ['Ad', '2s', '2c']
@@ -137,32 +136,35 @@ class agent:
         self.name = "Agent"
         self.hand = None
         self.hand_strength = None
-    def observe_hand(self, own_hand, other_hand):
+        self.total_winnings = 0
+    def observe_hand(self, own_hand, other_hand=None):
         self.hand = own_hand 
         self.hand_strength = analyse_hand(own_hand)
+        if other_hand:
+            pass
     def observe_bid(self, own_bid, other_bid, phase):
         pass # to be overridden by the random, fixed and simple reflex agents 
-    def bid_ammount(self, phase, bid_limit):
+    def bid_ammount(self, phase, bid_limit, other_bid=0):
         return 0 # to be overridden by the random, fixed and simple reflex agents
 
 class randomAgent(agent):
     def __init__(self):
-        super.__init__(self)
+        super().__init__()
     def bid_ammount(self, phase):
         return random.randrange(0, 50)
 class fixedAgent(agent):
     def __init__(self):
         self.current_bid = 10
-        super.__init__(self)
-    def bid_ammount(self, phase, bid_limit):
+        super().__init__()
+    def bid_ammount(self, phase, bid_limit, other_bid=0):
         bid = self.current_bid + 10*phase
         self.current_bid = min(bid_limit, bid)
         return bid
 class simpleReflexAgent(agent):
     def __init__(self):
-        super.__init__(self)
+        super().__init__()
         self.current_bid = 0
-    def bid_ammount(self, phase, bid_limit, own_bid, other_bid, bid_limit):
+    def bid_ammount(self, phase, bid_limit, other_bid):
         """strength = self.hand_strength
         base = 0
         bid = 0
@@ -215,37 +217,96 @@ class simpleReflexAgent(agent):
         return min(50, own_bid)
 
 
-
+class reflexAgentWithMemory(agent):  # Bonus agent
+    def __init__(self):
+        super().__init__()
+        self.last_bid = 0
+    
+    def bid_ammount(self, phase, bid_limit, other_bid=0):
+        strength = self.hand_strength
+        last_bid = self.last_bid  # Use opponent's last bid
+        bid = 0
+        if strength >= 27:  # Three of a kind
+            if strength >= 35:  # Strong three
+                bid = last_bid + 15 if last_bid <= 35 else last_bid + 5
+            else:
+                bid = last_bid + 10 if last_bid <= 25 else last_bid + 5
+        elif strength >= 14:  # Pair
+            if strength >= 22:  # Strong pair
+                bid = last_bid + 15 if last_bid <= 20 else last_bid + 5
+            else:
+                bid = last_bid + 10 if last_bid <= 15 else last_bid + 5
+        else:  # High card
+            if strength >= 10:  # Strong high
+                bid = last_bid + 15 if last_bid <= 10 else last_bid + 5
+            else:
+                bid = last_bid + 10 if last_bid <= 5 else last_bid + 5
+        return min(bid_limit, max(0, bid))
 
 #########################
 #      Game flow        #
 #########################
+
 n_phases = 3
 hand_bid_limit = 50
+hands_per_game = 50
+
+def play_hand(agent1, agent2):
+    """
+    Play one hand: deal cards, bid 3 times, showdown, update winnings.
+    Returns the pot won by agent1 (negative if agent2 wins).
+    """
+    # Card dealing
+    hand1, hand2 = generate_2hands(3)
+    agent1.observe_hand(hand1)
+    agent2.observe_hand(hand2)
+
+    pot = 0
+    for phase in range(1, n_phases + 1):
+        # Bidding
+        bid1 = agent1.bid_ammount(phase, hand_bid_limit, agent2.last_bid)
+        bid2 = agent2.bid_ammount(phase, hand_bid_limit, agent1.last_bid)
+        pot += bid1 + bid2
+        agent1.observe_bid(bid1, bid2, phase)
+        agent2.observe_bid(bid2, bid1, phase)
+
+    # Showdown
+    strength1 = agent1.hand_strength
+    strength2 = agent2.hand_strength
+    if strength1 > strength2:
+        agent1.total_winnings += pot
+        return pot
+    elif strength2 > strength1:
+        agent2.total_winnings += pot
+        return -pot
+    else:
+        # Tie: split pot (but since unlimited money, just 0 diff)
+        agent1.total_winnings += pot / 2
+        agent2.total_winnings += pot / 2
+        return 0
 
 
-#########################
-# phase 1: Card Dealing #
-#########################
-def card_dealing(agent1, agent2):
-    dealt_hands = []
-    for hand in generate_2hands(3):
-        dealt_hands.append(hand)
-    agent1.hand = dealt_hands[0]
-    agent2.hand = dealt_hands[1]
-    agent1.observe_hand(agent1.hand)
-    agent2.observe_hand(agent2.hand)
-
-#########################
-# phase 2:   Bidding    #
-#########################
-
-# Sensing, resoning & decision making, and acting
+def play_game(agent1, agent2, hands_per_game=50):
+    # play a full game (50 hands), return bankroll difference (agent1 - agent2).
+    for i in range(hands_per_game):
+        play_hand(agent1, agent2)
+    diff = agent1.total_winnings - agent2.total_winnings
+    # Reset for next game
+    agent1.total_winnings = 0
+    agent2.total_winnings = 0
+    return diff
 
 
-#########################
-# phase 2:   Showdown   #
-#########################
-
+def run_simulations(agent1_class, agent2_class, num_games=100):
+    """
+    Run num_games, return list of bankroll differences.
+    """
+    diffs = []
+    for _ in range(num_games):
+        agent1 = agent1_class()
+        agent2 = agent2_class()
+        diff = play_game(agent1, agent2, hands_per_game)
+        diffs.append(diff)
+    return diffs
 
 
