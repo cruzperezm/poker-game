@@ -6,6 +6,7 @@
 
 from itertools import combinations
 from collections import Counter
+import statistics
 import random
 
 ranks = [2, 3, 4, 5, 6, 7, 8, 9, 10, 'J', 'Q', 'K', 'A']
@@ -135,8 +136,9 @@ class agent:
     def __init__(self):
         self.name = "Agent"
         self.hand = None
-        self.hand_strength = None
+        self.hand_strength = 0
         self.total_winnings = 0
+        self.last_bid = 0
     def observe_hand(self, own_hand, other_hand=None):
         self.hand = own_hand 
         self.hand_strength = analyse_hand(own_hand)
@@ -144,25 +146,28 @@ class agent:
             pass
     def observe_bid(self, own_bid, other_bid, phase):
         pass # to be overridden by the random, fixed and simple reflex agents 
-    def bid_ammount(self, phase, bid_limit, other_bid=0):
+    def bid_ammount(self, phase, bid_limit, other_bid):
         return 0 # to be overridden by the random, fixed and simple reflex agents
-
+# Task 2a: implement a randomAgent
 class randomAgent(agent):
     def __init__(self):
         super().__init__()
-    def bid_ammount(self, phase):
-        return random.randrange(0, 50)
+        self.name = "Random Agent"
+    def bid_ammount(self, phase, bid_limit, other_bid):
+        return random.randrange(0, bid_limit + 1)
 class fixedAgent(agent):
     def __init__(self):
         self.current_bid = 10
         super().__init__()
-    def bid_ammount(self, phase, bid_limit, other_bid=0):
+        self.name = "Fixed Agent"
+    def bid_ammount(self, phase, bid_limit, other_bid):
         bid = self.current_bid + 10*phase
         self.current_bid = min(bid_limit, bid)
         return bid
 class simpleReflexAgent(agent):
     def __init__(self):
         super().__init__()
+        self.name = "Simple Reflex Agent"
         self.current_bid = 0
     def bid_ammount(self, phase, bid_limit, other_bid):
         """strength = self.hand_strength
@@ -178,7 +183,7 @@ class simpleReflexAgent(agent):
             bid = base + (s/5)*phase
         self.current_bid = bid
         return max(0, min(bid_limit, bid))"""
-        self.current_bid = own_bid
+        self.current_bid = 0
         strength = self.hand_strength
         if strength >= 27: # if the hand is a three of a kind 
             if strength >= 35:     # is the hand is a strong three of a kind 
@@ -221,8 +226,9 @@ class reflexAgentWithMemory(agent):  # Bonus agent
     def __init__(self):
         super().__init__()
         self.last_bid = 0
+        self.name = "Simple Reflex Agent (memory-based)"
     
-    def bid_ammount(self, phase, bid_limit, other_bid=0):
+    def bid_ammount(self, phase, bid_limit, other_bid):
         strength = self.hand_strength
         last_bid = self.last_bid  # Use opponent's last bid
         bid = 0
@@ -264,22 +270,34 @@ def play_hand(agent1, agent2):
     pot = 0
     for phase in range(1, n_phases + 1):
         # Bidding
+        print("\nBidding phase " + str(phase+1))
         bid1 = agent1.bid_ammount(phase, hand_bid_limit, agent2.last_bid)
+        print(f"\n{agent1.name}'s bid: " + str(bid1))
         bid2 = agent2.bid_ammount(phase, hand_bid_limit, agent1.last_bid)
+        print(f"\n{agent2.name}'s bid: " + str(bid2))
         pot += bid1 + bid2
+        print("\nPot: " + str(pot))
         agent1.observe_bid(bid1, bid2, phase)
         agent2.observe_bid(bid2, bid1, phase)
 
     # Showdown
+    print("\nShowdown")
     strength1 = agent1.hand_strength
     strength2 = agent2.hand_strength
+    hand1 = agent1.hand
+    print(f"\n{agent1.name}'s hand: " + str(hand1))
+    hand2 = agent2.hand
+    print(f"\n{agent2.name}'s hand: " + str(hand2))
     if strength1 > strength2:
+        print(f"\n{agent1.name} wins the round")
         agent1.total_winnings += pot
         return pot
     elif strength2 > strength1:
+        print(f"\n{agent2.name} wins the round")
         agent2.total_winnings += pot
         return -pot
     else:
+        print("\nTie, pot is split")
         # Tie: split pot (but since unlimited money, just 0 diff)
         agent1.total_winnings += pot / 2
         agent2.total_winnings += pot / 2
@@ -288,8 +306,14 @@ def play_hand(agent1, agent2):
 
 def play_game(agent1, agent2, hands_per_game=50):
     # play a full game (50 hands), return bankroll difference (agent1 - agent2).
+    print(f"{agent1.name} vs {agent2.name}")
     for i in range(hands_per_game):
+        print("\nRound " + str(i+1))
         play_hand(agent1, agent2)
+        winnings_1 = int(agent1.total_winnings)
+        winnings_2 = int(agent2.total_winnings)
+        print(f"\n{agent1.name}'s total winnings: " + str(winnings_1))
+        print(f"\n{agent2.name}'s total winnings: " + str(winnings_2))
     diff = agent1.total_winnings - agent2.total_winnings
     # Reset for next game
     agent1.total_winnings = 0
@@ -309,4 +333,15 @@ def run_simulations(agent1_class, agent2_class, num_games=100):
         diffs.append(diff)
     return diffs
 
+def analyze_agents(agent1_class, agent2_class, num_games=100):
+    diffs = run_simulations(agent1_class, agent2_class, num_games)
+    mean_diff = statistics.mean(diffs)
+    std_diff = statistics.stdev(diffs)
+    print(f"\n{agent1_class.__name__} vs {agent2_class.__name__}: Mean diff = {mean_diff:.2f}, Std = {std_diff:.2f}")
+    return mean_diff, std_diff
 
+
+#analyze_agents(randomAgent, fixedAgent)
+analyze_agents(simpleReflexAgent, randomAgent)
+#analyze_agents(simpleReflexAgent, fixedAgent)
+#analyze_agents(reflexAgentWithMemory, simpleReflexAgent)
