@@ -234,14 +234,14 @@ class reflexAgentWithMemory(agent):  # Bonus agent
         bid = 0
         if strength >= 27:  # Three of a kind
             if strength >= 35:  # Strong three
-                bid = last_bid + 15 if last_bid <= 35 else last_bid + 5
+                bid = last_bid + 15
             else:
-                bid = last_bid + 10 if last_bid <= 25 else last_bid + 5
+                bid = last_bid + 15 if last_bid <= 25 else last_bid + 10
         elif strength >= 14:  # Pair
             if strength >= 22:  # Strong pair
-                bid = last_bid + 15 if last_bid <= 20 else last_bid + 5
+                bid = last_bid + 15 if last_bid <= 20 else last_bid + 10
             else:
-                bid = last_bid + 10 if last_bid <= 15 else last_bid + 5
+                bid = last_bid + 20 if last_bid <= 15 else last_bid + 15
         else:  # High card
             if strength >= 10:  # Strong high
                 bid = last_bid + 15 if last_bid <= 10 else last_bid + 5
@@ -333,7 +333,7 @@ def run_simulations(agent1_class, agent2_class, num_games=100):
         diffs.append(diff)
     return diffs
 
-def analyze_agents(agent1_class, agent2_class, num_games=100):
+def analyze_agents(agent1_class, agent2_class, num_games=5):
     diffs = run_simulations(agent1_class, agent2_class, num_games)
     mean_diff = statistics.mean(diffs)
     std_diff = statistics.stdev(diffs)
@@ -341,7 +341,7 @@ def analyze_agents(agent1_class, agent2_class, num_games=100):
     return mean_diff, std_diff
 
 
-#analyze_agents(randomAgent, fixedAgent)
+analyze_agents(randomAgent, fixedAgent)
 analyze_agents(simpleReflexAgent, randomAgent)
-#analyze_agents(simpleReflexAgent, fixedAgent)
-#analyze_agents(reflexAgentWithMemory, simpleReflexAgent)
+analyze_agents(simpleReflexAgent, fixedAgent)
+analyze_agents(reflexAgentWithMemory, simpleReflexAgent)
